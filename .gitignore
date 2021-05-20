@@ -10,3 +10,7 @@ htmlcov
 
 env
 .dir-locals.el
+
+EXPERIMENT_LOG.org
+train/
+.ipynb_checkpoints
