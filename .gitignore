@@ -13,4 +13,5 @@ env
 
 EXPERIMENT_LOG.org
 train/
+logs/
 .ipynb_checkpoints
