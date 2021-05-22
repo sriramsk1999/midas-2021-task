@@ -17,25 +17,19 @@ class NumbersAndLettersCNN(pl.LightningModule):
     ''' Implementation of CNN to detect numbers and letters. '''
     def __init__(self, input_dim, output_classes):
         super().__init__()
-        self.conv1 = nn.Conv2d(input_dim[0], 16, 6)
-        self.conv2 = nn.Conv2d(16, 64, 6)
-        self.conv3 = nn.Conv2d(64, 128, 6)
-        self.conv4 = nn.Conv2d(128, 256, 6)
-        self.pool = nn.MaxPool2d(3)
-        self.fc1 = nn.Linear(256 * 8 * 12, 4096)
-        self.fc2 = nn.Linear(4096, 256)
-        self.fc3 = nn.Linear(256, output_classes)
+        self.conv1 = nn.Conv2d(input_dim[0], 64, 3, padding=2, stride=2)
+        self.conv2 = nn.Conv2d(64, 256, 3, padding=2, stride=2)
+        self.pool = nn.MaxPool2d(4)
+        self.fc1 = nn.Linear(256 * 14 * 19, output_classes)
 
     def forward(self, x):
         ''' Forward pass '''
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = self.pool(F.relu(self.conv3(x)))
-        x = self.pool(F.relu(self.conv4(x)))
+        x = self.pool(x) # Downsample image
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = self.pool(x)
         x = torch.flatten(x, 1) # flatten all dimensions except batch
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
+        x = self.fc1(x)
         return x
 
     def training_step(self, batch, batch_idx):
@@ -50,14 +44,14 @@ class NumbersAndLettersCNN(pl.LightningModule):
         output = self(x.float())
         loss = F.cross_entropy(output, y.long())
         acc = torch.mean((torch.argmax(output, axis=1) == y).float())
-        self.log_dict({'val_loss': loss, 'val_acc': acc})
+        self.log_dict({'val_loss': loss, 'val_acc': acc}, on_epoch=True, prog_bar=True)
 
     def test_step(self, batch, batch_idx):
         x, y = batch
         output = self(x.float())
         loss = F.cross_entropy(output, y.long())
         acc = torch.mean((torch.argmax(output, axis=1) == y).float())
-        self.log_dict({'test_loss': loss, 'test_acc': acc})
+        self.log_dict({'test_loss': loss, 'test_acc': acc}, on_epoch=True, prog_bar=True)
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=1e-3)
@@ -75,6 +69,8 @@ class NumbersAndLettersDataset(Dataset):
     def __getitem__(self, idx):
         img = torch.tensor(io.imread(self.input_data[idx]))
         img = img.permute(2, 0, 1) # Reshape to bring channels to first index
+        if self.transform:
+            pass
         return (img, self.target[idx])
 
 class NumbersAndLettersModule(pl.LightningDataModule):

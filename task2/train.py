@@ -6,11 +6,12 @@ import os
 
 import torch
 import pytorch_lightning as pl
+from pytorch_lightning.callbacks import EarlyStopping
 
 from numbers_and_letters import NumbersAndLettersCNN, NumbersAndLettersModule
 
 SEED = 42 # Set a global seed for reproducible results
-BATCH_SIZE = 4
+BATCH_SIZE = 32
 BASE_DIR = "train"
 SAVE_PATH = "models/"
 MODEL_NAME = 'numbers-and-letters-cnn'
@@ -31,7 +32,13 @@ model = NumbersAndLettersCNN(INPUT_DIM, OUTPUT_CLASSES)
 wandb_logger = pl.loggers.WandbLogger(save_dir='logs/',
                                         name=MODEL_NAME,
                                         project='midas-task-2')
-trainer = pl.Trainer(gpus=1, logger=wandb_logger, max_epochs=1)
+early_stopping = EarlyStopping(
+    monitor='val_loss',
+    patience=3,
+)
+
+trainer = pl.Trainer(gpus=1, logger=wandb_logger,
+                     callbacks=[early_stopping], min_epochs=5)
 trainer.fit(model, data_module)
 trainer.test(model=model, datamodule=data_module)
 
