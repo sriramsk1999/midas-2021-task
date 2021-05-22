@@ -29,7 +29,7 @@ model = NumbersAndLettersCNN(INPUT_DIM, OUTPUT_CLASSES)
 
 # Log metrics to WandB
 wandb_logger = pl.loggers.WandbLogger(save_dir='logs/',
-                                        name="%s.pth" %MODEL_NAME,
+                                        name=MODEL_NAME,
                                         project='midas-task-2')
 trainer = pl.Trainer(gpus=1, logger=wandb_logger, max_epochs=1)
 trainer.fit(model, data_module)
