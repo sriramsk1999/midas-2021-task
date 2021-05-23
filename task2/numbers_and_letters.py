@@ -22,16 +22,20 @@ class NumbersAndLettersCNN(pl.LightningModule):
         self.conv1 = nn.Conv2d(1, 16, 3)
         self.conv2 = nn.Conv2d(16, 32, 3)
         self.conv3 = nn.Conv2d(32, 64, 3)
-        self.fc1 = nn.Linear(64 * 5 * 8, output_classes)
+        self.conv4 = nn.Conv2d(64, 128, 3)
+        self.conv5 = nn.Conv2d(128, 256, 3)
+        self.fc1 = nn.Linear(256 * 1 * 3, output_classes)
         self.pool = nn.MaxPool2d(2)
         self.dropout1 = nn.Dropout(0.8)
         self.dropout2 = nn.Dropout(0.5)
 
     def forward(self, x):
         ''' Forward pass '''
-        x = self.dropout1(F.relu(self.conv1(x)))
+        x = self.pool(self.dropout1(F.relu(self.conv1(x))))
         x = self.pool(self.dropout2(F.relu(self.conv2(x))))
         x = self.pool(self.dropout2(F.relu(self.conv3(x))))
+        x = self.pool(self.dropout2(F.relu(self.conv4(x))))
+        x = self.dropout2(F.relu(self.conv5(x)))
         x = torch.flatten(x, 1) # flatten all dimensions except batch
         x = self.fc1(x)
         return x
@@ -58,7 +62,7 @@ class NumbersAndLettersCNN(pl.LightningModule):
         self.log_dict({'test_loss': loss, 'test_acc': acc}, on_epoch=True, prog_bar=True)
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=1e-3)
+        return torch.optim.Adam(self.parameters(), lr=1e-3, weight_decay=1e-4)
 
 class NumbersAndLettersDataset(Dataset):
     ''' Dataset for numbers and letters. '''
@@ -99,11 +103,12 @@ class NumbersAndLettersModule(pl.LightningDataModule):
 
             # Creating transforms
             transform = transforms.Compose([
-                transforms.Resize((30, 40)), # Scale down image
+                transforms.Resize((90, 120)), # Scale down image
                 transforms.Normalize((0.0583), (0.2322)),
                 transforms.GaussianBlur(3),
                 transforms.RandomRotation(30),
-                transforms.Lambda(lambda img: img + np.random.normal(size=np.array(img.shape), scale=0.05)),
+                transforms.Lambda(lambda img: img + np.random.normal(size=np.array(img.shape), scale=0.1)),
+                transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
             ])
 
             dataset = NumbersAndLettersDataset(img_dataset, img_classes, transform)
