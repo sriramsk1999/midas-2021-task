@@ -11,10 +11,10 @@ from pytorch_lightning.callbacks import EarlyStopping
 from numbers_and_letters import NumbersAndLettersCNN, NumbersAndLettersModule
 
 SEED = 42 # Set a global seed for reproducible results
-BATCH_SIZE = 32
+BATCH_SIZE = 128
 BASE_DIR = "train"
 SAVE_PATH = "models/"
-MODEL_NAME = 'numbers-and-letters-cnn'
+MODEL_NAME = '3conv1fc_drop_30x_blur&rotate&jitter'
 
 INPUT_DIM = torch.tensor([3, 900, 1200])
 OUTPUT_CLASSES = 62

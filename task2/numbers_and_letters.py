@@ -7,7 +7,9 @@ from typing import Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from skimage import io
+import numpy as np
+from torchvision import transforms
+from skimage import io, util
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
@@ -17,17 +19,19 @@ class NumbersAndLettersCNN(pl.LightningModule):
     ''' Implementation of CNN to detect numbers and letters. '''
     def __init__(self, input_dim, output_classes):
         super().__init__()
-        self.conv1 = nn.Conv2d(input_dim[0], 64, 3, padding=2, stride=2)
-        self.conv2 = nn.Conv2d(64, 256, 3, padding=2, stride=2)
-        self.pool = nn.MaxPool2d(4)
-        self.fc1 = nn.Linear(256 * 14 * 19, output_classes)
+        self.conv1 = nn.Conv2d(1, 16, 3)
+        self.conv2 = nn.Conv2d(16, 32, 3)
+        self.conv3 = nn.Conv2d(32, 64, 3)
+        self.fc1 = nn.Linear(64 * 5 * 8, output_classes)
+        self.pool = nn.MaxPool2d(2)
+        self.dropout1 = nn.Dropout(0.8)
+        self.dropout2 = nn.Dropout(0.5)
 
     def forward(self, x):
         ''' Forward pass '''
-        x = self.pool(x) # Downsample image
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = self.pool(x)
+        x = self.dropout1(F.relu(self.conv1(x)))
+        x = self.pool(self.dropout2(F.relu(self.conv2(x))))
+        x = self.pool(self.dropout2(F.relu(self.conv3(x))))
         x = torch.flatten(x, 1) # flatten all dimensions except batch
         x = self.fc1(x)
         return x
@@ -67,10 +71,10 @@ class NumbersAndLettersDataset(Dataset):
         return len(self.input_data)
 
     def __getitem__(self, idx):
-        img = torch.tensor(io.imread(self.input_data[idx]))
-        img = img.permute(2, 0, 1) # Reshape to bring channels to first index
-        if self.transform:
-            pass
+        img = io.imread(self.input_data[idx], as_gray=True)
+        img = torch.tensor(util.invert(img)) # Invert colours to be white on black
+        img = torch.unsqueeze(img, 0)
+        if self.transform: img = self.transform(img)
         return (img, self.target[idx])
 
 class NumbersAndLettersModule(pl.LightningDataModule):
@@ -93,11 +97,20 @@ class NumbersAndLettersModule(pl.LightningDataModule):
             le.fit(img_classes)
             img_classes = torch.tensor(le.transform(img_classes))
 
-            dataset = NumbersAndLettersDataset(img_dataset, img_classes)
+            # Creating transforms
+            transform = transforms.Compose([
+                transforms.Resize((30, 40)), # Scale down image
+                transforms.Normalize((0.0583), (0.2322)),
+                transforms.GaussianBlur(3),
+                transforms.RandomRotation(30),
+                transforms.Lambda(lambda img: img + np.random.normal(size=np.array(img.shape), scale=0.05)),
+            ])
 
-            # Creating train, test, val datasets according to an 80-10-10 split
-            self.nal_train, self.nal_test = train_test_split(dataset, test_size=0.1)
-            self.nal_train, self.nal_val = train_test_split(self.nal_train, test_size=0.1)
+            dataset = NumbersAndLettersDataset(img_dataset, img_classes, transform)
+
+            # Creating train, test, val datasets according to an ~90-5-5 split
+            self.nal_train, self.nal_test = train_test_split(dataset, test_size=0.05)
+            self.nal_train, self.nal_val = train_test_split(self.nal_train, test_size=0.05)
 
     def train_dataloader(self):
         return DataLoader(self.nal_train, batch_size=self.batch_size, num_workers=4)
