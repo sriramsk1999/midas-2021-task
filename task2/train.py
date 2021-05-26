@@ -10,23 +10,20 @@ from pytorch_lightning.callbacks import EarlyStopping
 
 from numbers_and_letters import NumbersAndLettersCNN, NumbersAndLettersModule
 
-SEED = 42 # Set a global seed for reproducible results
 BATCH_SIZE = 32
 BASE_DIR = "train"
 SAVE_PATH = "models/"
-MODEL_NAME = '5conv1fc_drop_10x_blur&rotate&jitter&affine'
+MODEL_NAME = '5conv1fc_drop_10x_blur&rotate&jitter&affine_cross-ent-weight'
 
 INPUT_DIM = torch.tensor([3, 900, 1200])
 OUTPUT_CLASSES = 62
-
-pl.utilities.seed.seed_everything(SEED)
 
 # Create DataModule to handle loading of dataset
 data_module = NumbersAndLettersModule(BASE_DIR, BATCH_SIZE)
 
 # Train and test model
 
-model = NumbersAndLettersCNN(INPUT_DIM, OUTPUT_CLASSES)
+model = NumbersAndLettersCNN(INPUT_DIM, OUTPUT_CLASSES, data_module.img_labels)
 
 # Log metrics to WandB
 wandb_logger = pl.loggers.WandbLogger(save_dir='logs/',
@@ -34,7 +31,7 @@ wandb_logger = pl.loggers.WandbLogger(save_dir='logs/',
                                         project='midas-task-2')
 early_stopping = EarlyStopping(
     monitor='val_loss',
-    patience=5,
+    patience=3,
 )
 
 trainer = pl.Trainer(gpus=1, logger=wandb_logger,

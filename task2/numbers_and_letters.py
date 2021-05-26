@@ -12,13 +12,17 @@ from torchvision import transforms
 from skimage import io, util
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 import pytorch_lightning as pl
 
 class NumbersAndLettersCNN(pl.LightningModule):
     ''' Implementation of CNN to detect numbers and letters. '''
-    def __init__(self, input_dim, output_classes):
+    def __init__(self, input_dim, output_classes, img_labels):
         super().__init__()
+        self.img_labels = img_labels
+        self.cross_ent_weight = self.init_cross_entropy_weights()
         self.conv1 = nn.Conv2d(1, 16, 3)
         self.conv2 = nn.Conv2d(16, 32, 3)
         self.conv3 = nn.Conv2d(32, 64, 3)
@@ -28,6 +32,13 @@ class NumbersAndLettersCNN(pl.LightningModule):
         self.pool = nn.MaxPool2d(2)
         self.dropout1 = nn.Dropout(0.8)
         self.dropout2 = nn.Dropout(0.5)
+
+    def init_cross_entropy_weights(self):
+        w = [1 for i in self.img_labels] # init with weight = 1 for each class
+        # Increase weight of tricky classes like [0,1,5,G,I,O,S,l,o,r]
+        for i in [0,1,5,16,18,24,28,47,50,53]:
+            w[i] += 1
+        return torch.tensor(w, device='cuda', dtype=torch.float32)
 
     def forward(self, x):
         ''' Forward pass '''
@@ -43,7 +54,7 @@ class NumbersAndLettersCNN(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         output = self(x.float())
-        loss = F.cross_entropy(output, y.long())
+        loss = F.cross_entropy(output, y.long(), weight=self.cross_ent_weight)
         self.log('train_loss', loss, on_epoch=True)
         return loss
 
@@ -57,9 +68,24 @@ class NumbersAndLettersCNN(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         x, y = batch
         output = self(x.float())
-        loss = F.cross_entropy(output, y.long())
         acc = torch.mean((torch.argmax(output, axis=1) == y).float())
-        self.log_dict({'test_loss': loss, 'test_acc': acc}, on_epoch=True, prog_bar=True)
+        return {'test_acc': acc,
+                'test_pred': torch.argmax(output, axis=1),
+                'test_actual': y}
+
+    def test_epoch_end(self, outputs):
+        test_acc = torch.squeeze(torch.stack([x['test_acc'] for x in outputs]).float()).mean()
+        test_pred = torch.cat([x['test_pred'] for x in outputs]).cpu().numpy()
+        test_actual = torch.cat([x['test_actual'] for x in outputs]).cpu().numpy()
+
+        conf_mat = confusion_matrix(test_actual, test_pred, normalize='true')
+        disp = ConfusionMatrixDisplay(confusion_matrix=conf_mat, display_labels=self.img_labels)
+        disp = disp.plot(include_values=True, cmap=plt.cm.Blues,
+                         ax=None, xticks_rotation='vertical')
+        disp.figure_.set_size_inches(22, 22)
+
+        self.logger.experiment.log({"confusion_matrix":disp.figure_})
+        self.logger.log_metrics({"test_acc":test_acc})
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=1e-3, weight_decay=1e-4)
@@ -85,22 +111,13 @@ class NumbersAndLettersModule(pl.LightningDataModule):
     ''' DataModule for loading of dataset. '''
     def __init__(self, data_dir, batch_size):
         super().__init__()
-        self.data_dir = data_dir
+        self.img_dataset, self.img_classes, self.img_labels = self.load_data(data_dir)
         self.batch_size = batch_size
         self.nal_train = None
-        self.nal_test = None
         self.nal_val = None
 
     def setup(self, stage: Optional[str] = None):
         if stage in (None, 'fit'): # Create all datasets
-            img_dataset, img_classes = self.load_data(self.data_dir)
-            print("Data loaded from disk")
-
-            # Prepare target using Label Encoding
-            le = LabelEncoder()
-            le.fit(img_classes)
-            img_classes = torch.tensor(le.transform(img_classes))
-
             # Creating transforms
             transform = transforms.Compose([
                 transforms.Resize((90, 120)), # Scale down image
@@ -111,11 +128,10 @@ class NumbersAndLettersModule(pl.LightningDataModule):
                 transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
             ])
 
-            dataset = NumbersAndLettersDataset(img_dataset, img_classes, transform)
+            dataset = NumbersAndLettersDataset(self.img_dataset, self.img_classes, transform)
 
-            # Creating train, test, val datasets according to an ~90-5-5 split
-            self.nal_train, self.nal_test = train_test_split(dataset, test_size=0.05)
-            self.nal_train, self.nal_val = train_test_split(self.nal_train, test_size=0.05)
+            # Creating train, val datasets according to an 85-15 split
+            self.nal_train, self.nal_val = train_test_split(dataset, test_size=0.15)
 
     def train_dataloader(self):
         return DataLoader(self.nal_train, batch_size=self.batch_size, num_workers=4)
@@ -124,7 +140,7 @@ class NumbersAndLettersModule(pl.LightningDataModule):
         return DataLoader(self.nal_val, batch_size=self.batch_size, num_workers=4)
 
     def test_dataloader(self):
-        return DataLoader(self.nal_test, batch_size=self.batch_size, num_workers=4)
+        return DataLoader(self.nal_val, batch_size=self.batch_size, num_workers=4)
 
     def load_data(self, img_dir):
         ''' Load image_paths and their classes from disk. '''
@@ -141,4 +157,10 @@ class NumbersAndLettersModule(pl.LightningDataModule):
                 img_path = os.path.join(img_dir, folder, img)
                 dataset.append(img_path)
                 classes.append(img_class)
-        return dataset, classes
+
+        # Prepare using Label Encoding
+        le = LabelEncoder()
+        le.fit(classes)
+        labels = le.classes_
+        classes = torch.tensor(le.transform(classes))
+        return dataset, classes, labels
