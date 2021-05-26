@@ -11,7 +11,8 @@ htmlcov
 env
 .dir-locals.el
 
-EXPERIMENT_LOG.org
+EXPERIMENT_LOG*.org
+MNIST/
 train/
 logs/
 .ipynb_checkpoints

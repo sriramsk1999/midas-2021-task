@@ -19,9 +19,10 @@ import pytorch_lightning as pl
 
 class NumbersAndLettersCNN(pl.LightningModule):
     ''' Implementation of CNN to detect numbers and letters. '''
-    def __init__(self, input_dim, output_classes, img_labels):
+    def __init__(self, input_dim, output_classes, img_labels, numbers_only):
         super().__init__()
         self.img_labels = img_labels
+        self.numbers_only = numbers_only
         self.cross_ent_weight = self.init_cross_entropy_weights()
         self.conv1 = nn.Conv2d(1, 16, 3)
         self.conv2 = nn.Conv2d(16, 32, 3)
@@ -34,6 +35,7 @@ class NumbersAndLettersCNN(pl.LightningModule):
         self.dropout2 = nn.Dropout(0.5)
 
     def init_cross_entropy_weights(self):
+        if self.numbers_only: return None
         w = [1 for i in self.img_labels] # init with weight = 1 for each class
         # Increase weight of tricky classes like [0,1,5,G,I,O,S,l,o,r]
         for i in [0,1,5,16,18,24,28,47,50,53]:
@@ -109,8 +111,9 @@ class NumbersAndLettersDataset(Dataset):
 
 class NumbersAndLettersModule(pl.LightningDataModule):
     ''' DataModule for loading of dataset. '''
-    def __init__(self, data_dir, batch_size):
+    def __init__(self, data_dir, batch_size, numbers_only):
         super().__init__()
+        self.numbers_only = numbers_only
         self.img_dataset, self.img_classes, self.img_labels = self.load_data(data_dir)
         self.batch_size = batch_size
         self.nal_train = None
@@ -148,6 +151,7 @@ class NumbersAndLettersModule(pl.LightningDataModule):
         classes = []
         for folder in os.listdir(img_dir):
             img_class = int(folder[-2:]) # Extract last 2 digits of folder name
+            if self.numbers_only and img_class >= 11: continue
             if img_class < 11:
                 img_class = str(img_class - 1) # 0-9
             elif img_class < 37:

@@ -3,27 +3,42 @@ Train and test the neural network
 '''
 
 import os
+import argparse
 
 import torch
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping
 
 from numbers_and_letters import NumbersAndLettersCNN, NumbersAndLettersModule
+from mnist import MNISTModule
 
-BATCH_SIZE = 32
-BASE_DIR = "train"
+parser = argparse.ArgumentParser()
+parser.add_argument('--dataset', default='numbers_and_letters')
+parser.add_argument('--pretrained', default=False)
+args = parser.parse_args()
+
 SAVE_PATH = "models/"
-MODEL_NAME = '5conv1fc_drop_10x_blur&rotate&jitter&affine_cross-ent-weight'
+MODEL_NAME = '5conv1fc_mnist'
+LOAD_MODEL_NAME = '5conv1fc_mnist'
+BATCH_SIZE = 32
+NUMBERS_ONLY = True
 
-INPUT_DIM = torch.tensor([3, 900, 1200])
-OUTPUT_CLASSES = 62
+if args.dataset == 'numbers_and_letters':
+    BASE_DIR = "train"
+    INPUT_DIM = torch.tensor([3, 900, 1200])
 
-# Create DataModule to handle loading of dataset
-data_module = NumbersAndLettersModule(BASE_DIR, BATCH_SIZE)
-
-# Train and test model
-
-model = NumbersAndLettersCNN(INPUT_DIM, OUTPUT_CLASSES, data_module.img_labels)
+    # Create DataModule to handle loading of dataset
+    data_module = NumbersAndLettersModule(BASE_DIR, BATCH_SIZE, NUMBERS_ONLY)
+    model = NumbersAndLettersCNN(INPUT_DIM, len(data_module.img_labels),
+                                 data_module.img_labels, NUMBERS_ONLY)
+elif args.dataset == 'mnist':
+    data_module = MNISTModule(BATCH_SIZE)
+    INPUT_DIM = torch.tensor([1, 28, 28])
+    model = NumbersAndLettersCNN(INPUT_DIM, 10, ['0','1','2','3','4',
+                                                 '5','6','7','8','9'], NUMBERS_ONLY)
+else:
+    print("Invalid dataset choice")
+    exit(0)
 
 # Log metrics to WandB
 wandb_logger = pl.loggers.WandbLogger(save_dir='logs/',
@@ -33,6 +48,10 @@ early_stopping = EarlyStopping(
     monitor='val_loss',
     patience=3,
 )
+
+if args.pretrained:
+    model.load_state_dict(torch.load(os.path.join(SAVE_PATH, LOAD_MODEL_NAME),
+                                     map_location=torch.device('cuda')))
 
 trainer = pl.Trainer(gpus=1, logger=wandb_logger,
                      callbacks=[early_stopping], min_epochs=5)
