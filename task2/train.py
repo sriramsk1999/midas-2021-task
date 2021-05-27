@@ -19,7 +19,7 @@ args = parser.parse_args()
 
 SAVE_PATH = "models/"
 MODEL_NAME = '5conv1fc_mnist'
-LOAD_MODEL_NAME = '5conv1fc_mnist'
+LOAD_MODEL_NAME = '5conv1fc_numbers'
 BATCH_SIZE = 32
 NUMBERS_ONLY = True
 
@@ -46,7 +46,6 @@ wandb_logger = pl.loggers.WandbLogger(save_dir='logs/',
                                         project='midas-task-2')
 early_stopping = EarlyStopping(
     monitor='val_loss',
-    patience=3,
 )
 
 if args.pretrained:
@@ -54,7 +53,7 @@ if args.pretrained:
                                      map_location=torch.device('cuda')))
 
 trainer = pl.Trainer(gpus=1, logger=wandb_logger,
-                     callbacks=[early_stopping], min_epochs=5)
+                     callbacks=[early_stopping])
 trainer.fit(model, data_module)
 trainer.test(model=model, datamodule=data_module)
 
