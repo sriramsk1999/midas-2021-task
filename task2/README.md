@@ -34,3 +34,15 @@ python train.py --dataset mnist
 ```
 
 *Task 2.3*
+
+Train on mnist_wrong:
+
+``` sh
+python train.py --dataset mnist_wrong
+```
+
+To use a pretrained model on mnist_wrong: (make sure LOAD_MODEL_NAME is set the current model weights to load)
+
+``` sh
+python train.py --dataset mnist_wrong --pretrained True
+```
