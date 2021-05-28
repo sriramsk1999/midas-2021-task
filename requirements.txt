@@ -106,6 +106,7 @@ threadpoolctl==2.1.0
 tifffile==2021.4.8
 toml==0.10.2
 torch==1.8.1
+torchaudio==0.8.1
 torchmetrics==0.3.2
 torchvision==0.9.1
 tornado==6.1
