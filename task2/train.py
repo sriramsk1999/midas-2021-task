@@ -11,6 +11,7 @@ from pytorch_lightning.callbacks import EarlyStopping
 
 from numbers_and_letters import NumbersAndLettersCNN, NumbersAndLettersModule
 from mnist import MNISTModule
+from mnist_wrong import MNISTWrongModule
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='numbers_and_letters')
@@ -18,7 +19,7 @@ parser.add_argument('--pretrained', default=False)
 args = parser.parse_args()
 
 SAVE_PATH = "models/"
-MODEL_NAME = '5conv1fc_mnist'
+MODEL_NAME = '5conv1fc_mnist_wrong'
 LOAD_MODEL_NAME = '5conv1fc_numbers'
 BATCH_SIZE = 32
 NUMBERS_ONLY = True
@@ -36,6 +37,11 @@ elif args.dataset == 'mnist':
     INPUT_DIM = torch.tensor([1, 28, 28])
     model = NumbersAndLettersCNN(INPUT_DIM, 10, ['0','1','2','3','4',
                                                  '5','6','7','8','9'], NUMBERS_ONLY)
+elif args.dataset == 'mnist_wrong':
+    data_module = MNISTWrongModule(BATCH_SIZE)
+    INPUT_DIM = torch.tensor([1, 28, 28])
+    model = NumbersAndLettersCNN(INPUT_DIM, 10, ['0','1','2','3','4',
+                                                 '5','6','7','8','9'], NUMBERS_ONLY)
 else:
     print("Invalid dataset choice")
     exit(0)
@@ -46,6 +52,7 @@ wandb_logger = pl.loggers.WandbLogger(save_dir='logs/',
                                         project='midas-task-2')
 early_stopping = EarlyStopping(
     monitor='val_loss',
+    patience=1
 )
 
 if args.pretrained:

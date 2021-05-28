@@ -14,5 +14,6 @@ env
 EXPERIMENT_LOG*.org
 MNIST/
 train/
+mnistTask/
 logs/
 .ipynb_checkpoints
