@@ -8,9 +8,9 @@ from audio_commands import AudioCommandsNN
 
 SAVE_PATH = "models/"
 BASE_DIR = 'train/audio'
-MODEL_NAME = 'm5_more-unk'
-LOAD_MODEL_NAME = 'tbd'
+MODEL_NAME = 'm5_less-unk-sil_notrans'
 BATCH_SIZE = 32
+TRAIN = True
 
 data_module = AudioCommandsModule(BASE_DIR, BATCH_SIZE)
 model = AudioCommandsNN(1, 12, data_module.labels)
@@ -25,9 +25,8 @@ early_stopping = EarlyStopping(
 )
 
 trainer = pl.Trainer(gpus=1, logger=wandb_logger,
-                     callbacks=[early_stopping])
+                    callbacks=[early_stopping])
 trainer.fit(model, data_module)
-# trainer.test(model=model, datamodule=data_module)
 
 # Save model
 torch.save(model.state_dict(), os.path.join(SAVE_PATH, MODEL_NAME))

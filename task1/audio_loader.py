@@ -42,16 +42,14 @@ class AudioCommandsModule(pl.LightningDataModule):
 
     def setup(self, stage: Optional[str] = None):
         if stage in (None, 'fit'): # Create all datasets
-            transform = torchvision.transforms.Compose([
-                torchaudio.transforms.Resample(16000, 8000),
-                torchvision.transforms.Lambda(lambda audio: torch.mul(audio, 10))
-            ])
-            dataset = AudioCommandsDataset(self.dataset, self.classes, transform)
+            # transform = torchvision.transforms.Compose([
+            #     torchaudio.transforms.Resample(16000, 8000),
+            #     torchvision.transforms.Lambda(lambda audio: torch.mul(audio, 10))
+            # ])
+            dataset = AudioCommandsDataset(self.dataset, self.classes)
 
             # Creating train, val datasets according to an 85-15 split
             self.audio_train, self.audio_val = train_test_split(dataset, test_size=0.1)
-
-            test_data = load_test_data(base_dir)
 
     def train_dataloader(self):
         return DataLoader(self.audio_train, batch_size=self.batch_size, num_workers=8)
@@ -86,7 +84,7 @@ def load_unk_data(base_dir):
     for cls in auxiliary_classes: # Unknown
         files = os.listdir(os.path.join(base_dir, cls))
         population.extend([os.path.join(base_dir, cls, f) for f in files])
-    files = random.sample(population, 4000)
+    files = random.sample(population, 1000)
     for f in files:
         audio = torchaudio.load(f)[0]
         padding = 16000 - audio.shape[1]
@@ -99,13 +97,16 @@ def load_sil_data(base_dir):
     ''' Load background noise for the 'silence' class. '''
     dataset, target = [], []
     base_dir = os.path.join(base_dir, '_background_noise_')
-    while len(dataset) < 2300:
+    while len(dataset) < 600:
         for f in os.listdir(os.path.join(base_dir)):
             audio_sample = torchaudio.load(os.path.join(base_dir, f),
                                            frame_offset = random.randint(0, 16000*59),
                                            num_frames = 16000)[0]
             dataset.append(audio_sample)
             target.append('silence')
+    for i in range(600):
+        dataset.append(torch.zeros(1, 16000))
+        target.append('silence')
     return dataset, target
 
 def load_data(base_dir):
