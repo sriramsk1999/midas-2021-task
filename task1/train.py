@@ -10,7 +10,6 @@ SAVE_PATH = "models/"
 BASE_DIR = 'train/audio'
 MODEL_NAME = 'm5_less-unk-sil_notrans'
 BATCH_SIZE = 32
-TRAIN = True
 
 data_module = AudioCommandsModule(BASE_DIR, BATCH_SIZE)
 model = AudioCommandsNN(1, 12, data_module.labels)

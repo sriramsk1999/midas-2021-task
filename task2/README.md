@@ -6,6 +6,10 @@
 
 *numbers_and_letters.py* -> Holds implementation of dataset and the neural network that has been used in training on task2.1 i.e. numbers and letters.
 
+*mnist.py* -> Holds implementation of MNIST dataset 
+
+*mnist_wrong.py* -> Holds implementation of wrongly labeled MNIST dataset.
+
 ## Running
 
 *Task 2.1*
